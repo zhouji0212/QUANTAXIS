@@ -695,10 +695,12 @@ class QA_Account(QA_Worker):
             tax_fee = 0  # 买入不收印花税
 
         _trade_money_frozen = abs(trade_money) + commission_fee+ tax_fee
-        trade_money += (commission_fee+tax_fee)
-        
+        if trade_money<=0:
+            trade_money -= (commission_fee+tax_fee)
+        else:
+            trade_money += (commission_fee+tax_fee)
 
-        if self.cash[-1] > trade_money:
+        if self.cash[-1] > abs(trade_money) :  #资金大于交易资金+手续费
             self.time_index.append(trade_time)
             # TODO: 目前还不支持期货的锁仓
             if self.allow_sellopen:
@@ -715,12 +717,14 @@ class QA_Account(QA_Worker):
                             ORDER_DIRECTION.BUY_OPEN: {
                                 'money': 0, 'amount': 0},
                             ORDER_DIRECTION.SELL_OPEN: {
-                                'money': 0, 'amount': 0}
+                                'money': _trade_money_frozen, 'amount': trade_amount}
                         }
 
                     self.frozen[code][trade_towards]['money'] = (
                         (self.frozen[code][trade_towards]['money']*self.frozen[code][trade_towards]['amount'])+abs(trade_money))/(self.frozen[code][trade_towards]['amount']+trade_amount)
+                            #冻结资金算法 明天看看怎么计算的
                     self.frozen[code][trade_towards]['amount'] += trade_amount
+                        #交易笔数更新
 
                     self.cash.append(self.cash[-1]-_trade_money_frozen)
                 elif trade_towards in [ORDER_DIRECTION.BUY_CLOSE, ORDER_DIRECTION.SELL_CLOSE]:

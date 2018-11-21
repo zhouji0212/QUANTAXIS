@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import numpy as np
 
-starttime = datetime.date(2018,1,16)
+starttime = datetime.date(2018,9,16)
 endtime = datetime.date(2018,11,10)
 strstartday = str(starttime-datetime.timedelta(days=1))
 strstartmaday = str(starttime-datetime.timedelta(days=90))
@@ -11,7 +11,7 @@ strstartmin = str(starttime-datetime.timedelta(days=3))
 strendday = str(endtime)
 strendmin = str(endtime)
 
-init_cash = 10000
+init_cash = 100000
 margin = 1
 #products = ['MA1901', 'I1901', 'RM1901', 'TA1901']
 products = ['RBL8']
@@ -207,6 +207,6 @@ Account.trade.to_csv('trademx.csv')
 
 Risk.assets.to_csv('asserts.csv')
 
-plt=Risk.plot_assets_curve()
+plt=Risk.plot_future_assets_curve()
 
 plt.show()
