@@ -219,7 +219,7 @@ class QA_Risk():
         return float(round(self.assets.iloc[-1]-self.init_cash, 2))
 
     @property
-    def profit(self):
+    def profitrate(self):
         """盈利率(百分比)
 
         Returns:
@@ -265,11 +265,42 @@ class QA_Risk():
             'portfolio_cookie': self.account.portfolio_cookie,
             'user_cookie': self.account.user_cookie,
             'annualize_return': round(self.annualize_return, 2),
-            'profit': round(self.profit, 2),
+            'profit': round(self.profitrate, 2),
             'max_dropback': self.max_dropback,
             'time_gap': self.time_gap,
             'volatility': self.volatility,
             'benchmark_code': self.benchmark_code,
+            'bm_annualizereturn': self.benchmark_annualize_return,
+            'bm_profit': self.benchmark_profit,
+            'beta': self.beta,
+            'alpha': self.alpha,
+            'sharpe': self.sharpe,
+            'init_cash': "%0.2f" % (float(self.init_cash)),
+            'last_assets': "%0.2f" % (float(self.assets.iloc[-1])),
+            'total_tax': self.total_tax,
+            'total_commission': self.total_commission,
+            'profit_money': self.profit_money,
+            'assets': list(self.assets),
+            'benchmark_assets': list(self.benchmark_assets),
+            'timeindex': self.account.trade_day,
+            'totaltimeindex': self.total_timeindex,
+            'ir': self.ir
+            # 'init_assets': round(float(self.init_assets), 2),
+            # 'last_assets': round(float(self.assets.iloc[-1]), 2)
+        }
+
+    @property
+    @lru_cache()
+    def feture_message(self):
+        return {
+            'account_cookie': self.account.account_cookie,
+            'portfolio_cookie': self.account.portfolio_cookie,
+            'user_cookie': self.account.user_cookie,
+            'annualize_return': round(self.annualize_return, 2),
+            'profitrate': round(self.profitrate, 4),
+            'max_dropback': self.max_dropback,
+            'time_gap': self.time_gap,
+            'volatility': self.volatility,
             'bm_annualizereturn': self.benchmark_annualize_return,
             'bm_profit': self.benchmark_profit,
             'beta': self.beta,
@@ -568,6 +599,54 @@ class QA_Risk():
         self.plot_assets_curve()
         self.plot_dailyhold()
         self.plot_signal()
+
+    def plot_future_assets_curve(self, length=14, height=12):
+        """
+        资金曲线叠加图
+        @Roy T.Burns 2018/05/29 修改百分比显示错误
+        """
+        plt.style.use('ggplot')
+        plt.figure(figsize=(length, height))
+        plt.subplot(211)
+        plt.title('Future Info', fontsize=12)
+        plt.axis([0, length, 0, 0.6])
+        plt.axis('off')
+        i = 0
+        for item in ['account_cookie', 'portfolio_cookie', 'user_cookie']:
+            plt.text(i, 0.5, '{} : {}'.format(
+                item, self.message[item]), fontsize=10, rotation=0, wrap=True)
+            i += (length/2.8)
+        i = 0
+        for item in ['time_gap', 'max_dropback','profit_money']:
+            plt.text(i, 0.4, '{} : {}'.format(
+                item, self.message[item]), fontsize=10, ha='left', rotation=0, wrap=True)
+            i += (length/2.8)
+        i = 0
+        for item in ['annualize_return', 'bm_annualizereturn', 'profit']:
+            plt.text(i, 0.3, '{} : {} %'.format(item, self.message.get(
+                item, 0)*100), fontsize=10, ha='left', rotation=0, wrap=True)
+            i += length/2.8
+        i = 0
+        for item in ['init_cash', 'last_assets', 'volatility']:
+            plt.text(i, 0.2, '{} : {} '.format(
+                item, self.message[item]), fontsize=10, ha='left', rotation=0, wrap=True)
+            i += length/2.8
+        i = 0
+        for item in ['alpha', 'beta', 'sharpe']:
+            plt.text(i, 0.1, '{} : {}'.format(
+                item, self.message[item]), ha='left', fontsize=10, rotation=0, wrap=True)
+            i += length/2.8
+        plt.subplot(212)
+        self.assets.plot()
+
+
+        asset_p = mpatches.Patch(
+            color='red', label='{}'.format(self.account.account_cookie))
+
+        plt.legend(handles=[asset_p], loc=1)
+        plt.title('ASSET Line')
+
+        return plt
 
 
 class QA_Performance():
