@@ -718,6 +718,8 @@ class QA_Account(QA_Worker):
                                 'money': 0, 'amount': 0},
                             ORDER_DIRECTION.SELL_OPEN: {
                                 'money': _trade_money_frozen, 'amount': trade_amount}
+                            # ORDER_DIRECTION.SELL_OPEN: {
+                            #     'money': 0, 'amount': 0}
                         }
 
                     self.frozen[code][trade_towards]['money'] = (
