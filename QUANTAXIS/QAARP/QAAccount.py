@@ -163,7 +163,16 @@ class QA_Account(QA_Worker):
                 -1, amount # 空单待平仓
             }
         }
+
+        2018-11-22:需要实现一个账户持仓列表的多重字典：列表，用于实现多笔买入后的先进先出平仓，并实现保证金比例的计算
+        ｛
+            I1901:{
+                    1:[[7890:10],[7898:11]]
+                    }
+        ｝
         """
+
+
         super().__init__()
         # warnings.warn('QUANTAXIS 1.0.46 has changed the init_assets ==> init_cash, please pay attention to this change if you using init_cash to initial an account class,\
         #         ', DeprecationWarning, stacklevel=2)
@@ -203,6 +212,7 @@ class QA_Account(QA_Worker):
         self.buy_available = copy.deepcopy(self.init_hold)
         self.history = []
         self.time_index = []
+        self.future_hold = {}
         ########################################################################
         # 规则类
         # 1.是否允许t+0 及买入及结算
@@ -626,7 +636,7 @@ class QA_Account(QA_Worker):
             self.cash_available = self.cash[-1]
             #print('NOT ENOUGH MONEY FOR {}'.format(order_id))
 
-    def receive_deal(self, code: str, trade_id: str, order_id: str, realorder_id: str, trade_price: float, trade_amount: int, trade_towards: int, trade_time: str, message=None):
+    def receive_deal(self, code: str, trade_id: str, order_id: str, realorder_id: str, trade_price: float, trade_amount: int, trade_towards: int, trade_time: str, message=None, marginrate = 1):
         """更新deal
 
         Arguments:
@@ -694,19 +704,19 @@ class QA_Account(QA_Worker):
 
             tax_fee = 0  # 买入不收印花税
 
-        _trade_money_frozen = abs(trade_money) + commission_fee+ tax_fee
+        _trade_money_frozen = abs(trade_money)* marginrate + commission_fee+ tax_fee
         if trade_money<=0:
             trade_money -= (commission_fee+tax_fee)
         else:
             trade_money += (commission_fee+tax_fee)
 
-        if self.cash[-1] > abs(trade_money) :  #资金大于交易资金+手续费
+        if self.cash[-1] > abs(_trade_money_frozen) :  #保证金+手续费>资金余额
             self.time_index.append(trade_time)
             # TODO: 目前还不支持期货的锁仓
             if self.allow_sellopen:
                 if trade_towards in [ORDER_DIRECTION.BUY_OPEN, ORDER_DIRECTION.SELL_OPEN]:
                     # 开仓单占用现金 计算avg
-                    # 初始化
+                    # 初始化,开仓初始化
                     if code in self.frozen.keys():
                         if trade_towards in self.frozen[code].keys():
                             pass
@@ -715,20 +725,39 @@ class QA_Account(QA_Worker):
                     else:
                         self.frozen[code] = {
                             ORDER_DIRECTION.BUY_OPEN: {
-                                'money': 0, 'amount': 0},
-                            ORDER_DIRECTION.SELL_OPEN: {
-                                'money': _trade_money_frozen, 'amount': trade_amount}
+                               'trade_price': 0, 'money': 0, 'amount': 0, 'frozen': 0},
                             # ORDER_DIRECTION.SELL_OPEN: {
-                            #     'money': 0, 'amount': 0}
+                            #     'money': _trade_money_frozen, 'amount': trade_amount}
+                            ORDER_DIRECTION.SELL_OPEN: {
+                                'trade_price': 0, 'money': 0, 'amount': 0, 'frozen': 0}
                         }
+                    if code in self.future_hold.keys():
+                        if trade_towards in self.future_hold[code].keys():
+                            pass
+                        else:
+                            self.future_hold[code]=trade_towards:{}
+                        #建立品种的持仓队列
 
+
+                    self.frozen[code]=[trade_towards]['frozen'] = (
+                        (self.frozen[code][trade_towards]['frozen']*
+                         self.frozen[code][trade_towards]['amount'])+
+                        _trade_money_frozen)/(self.frozen[code][trade_towards]['amount']+trade_amount)
+
+                            #单笔冻结资金 = 历史金额*历史数量+当次交易总金额/(所有交易总数量)
                     self.frozen[code][trade_towards]['money'] = (
-                        (self.frozen[code][trade_towards]['money']*self.frozen[code][trade_towards]['amount'])+abs(trade_money))/(self.frozen[code][trade_towards]['amount']+trade_amount)
-                            #冻结资金算法 明天看看怎么计算的
+                                                                        (self.frozen[code][trade_towards]['money'] *
+                                                                         self.frozen[code][trade_towards][
+                                                                             'amount']) + abs(trade_money)) / (
+                                                                            self.frozen[code][trade_towards][
+                                                                                'amount'] + trade_amount)
                     self.frozen[code][trade_towards]['amount'] += trade_amount
                         #交易笔数更新
+                    #self.frozen[code][trade_towards]['trade_price'] = trade_price  #可能要算个持仓均价
 
                     self.cash.append(self.cash[-1]-_trade_money_frozen)
+                    #现金减少更新
+                    self.future_hold[code][trade_towards].appand([trade_price,trade_amount,commission_fee])
                 elif trade_towards in [ORDER_DIRECTION.BUY_CLOSE, ORDER_DIRECTION.SELL_CLOSE]:
                     # 平仓单释放现金
                     # if trade_towards == ORDER_DIRECTION.BUY_CLOSE:
@@ -737,8 +766,15 @@ class QA_Account(QA_Worker):
                     if trade_towards == ORDER_DIRECTION.BUY_CLOSE:# 买入平仓  之前是空开
                         # self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] -= trade_money
                         self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] -= trade_amount
+                        #TODO:需要计算平仓盈亏问题？-ZHOUJI
+                        buy_close_profit = 0
+
+                        for buy_price,buy_volume,buy_commission in self.future_hold[code][ORDER_DIRECTION.SELL_OPEN]:
+                            if buy_volume> trade_amount:
+                                self.future_hold[code][ORDER_DIRECTION.SELL_OPEN][0][1] -= trade_amount
+                                buy_close_profit = (trade_price-buy_price-buy_commission)* buy_volume
                         self.cash.append(
-                            self.cash[-1]-trade_money+self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money']*trade_amount*2)
+                            self.cash[-1]+buy_close_profit+self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['forzen'])  #+profit??) #资金占用=余额-保证金
                         if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
                             self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] = 0
 
@@ -746,11 +782,11 @@ class QA_Account(QA_Worker):
                         # self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] -= trade_money
                         self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] -= trade_amount
                         self.cash.append(
-                            self.cash[-1]-trade_money)
+                            self.cash[-1]-_trade_money_frozen)  #使用保证金交易
                         if self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] == 0:
                             self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] = 0
             else:
-                self.cash.append(self.cash[-1]-trade_money)
+                self.cash.append(self.cash[-1]-_trade_money_frozen) #修改为保证金交易
                 self.cash_available = self.cash[-1]
 
             self.history.append(
