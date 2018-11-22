@@ -39,4 +39,5 @@ class Test_FutureAccount(unittest.TestCase):
                               res.trade_price, res.trade_amount, res.towards, res.trade_time,marginrate=0.1)
                 i =i+1
                 account.settle()
+                print(account.future_total_hold)
         account.history_table.to_clipboard()
