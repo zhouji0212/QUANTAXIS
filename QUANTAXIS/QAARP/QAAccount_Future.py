@@ -724,28 +724,34 @@ class QA_Account_Future(QA_Worker):
                             self.frozen[code][trade_towards] = {'trade_price':0, 'money': 0, 'volume':0, 'frozen':0, 'commission': 0, 'amount': 0}
                     else:
                         self.frozen[code] = {
-                            ORDER_DIRECTION.BUY_OPEN: [].append({
-                               'trade_price':0, 'money': 0, 'volume':0, 'frozen':0, 'commission': 0, 'amount': 0}),
-                            # ORDER_DIRECTION.SELL_OPEN: {
-                            #     'money': _trade_money_frozen, 'amount': trade_amount}
-                            ORDER_DIRECTION.SELL_OPEN: [].append({
-                                'trade_price':0, 'money': 0, 'volume':0, 'frozen':0, 'commission': 0, 'amount': 0})
+                            ORDER_DIRECTION.BUY_OPEN: [],
+                            ORDER_DIRECTION.SELL_OPEN: []
                         }
-                    if code in self.future_hold.keys():
-                        if trade_towards in self.future_hold[code].keys():
-                            pass
+                        # self.frozen[code][ORDER_DIRECTION.BUY_OPEN].append(
+                        #     {'trade_price': 0, 'money': 0, 'volume': 0, 'frozen': 0, 'commission': 0, 'amount': 0}
+                        # )
+                        # self.frozen[code][ORDER_DIRECTION.SELL_OPEN].append(
+                        #     {'trade_price': 0, 'money': 0, 'volume': 0, 'frozen': 0, 'commission': 0, 'amount': 0}
+                        # )
+                    # if code in self.future_hold.keys():
+                    #     if trade_towards in self.future_hold[code].keys():
+                    #         pass
+                    # else:
+                    #     self.future_hold[code] = {trade_towards:[]}
+                    #     #建立品种的持仓队列
+                    temp_amount = 0
+                    if len(self.frozen[code][trade_towards])==0:
+                        temp_amount = trade_amount
                     else:
-                        self.future_hold[code] = {trade_towards:[]}
-                        #建立品种的持仓队列
+                        temp_amount = self.frozen[code][trade_towards][-1]['amount'] + trade_amount
                     frozendic = {
-                        'trade_prce':trade_price,
+                        'trade_prce': trade_price,
                         'money': trade_money,
                         'volume': trade_amount,
                         'frozen': _trade_money_frozen,
                         'commission': commission_fee,
-                        'amount': self.frozen[code][trade_towards][-1]['amount']+trade_amount  #看看可能会有负数
-                                 }
-
+                        'amount': temp_amount  # 看看可能会有负数
+                    }
                     # self.frozen[code][trade_towards]['frozen'] = ((self.frozen[code][trade_towards]['frozen']*self.frozen[code][trade_towards]['amount'])+_trade_money_frozen)/(self.frozen[code][trade_towards]['amount']+trade_amount)
 
                             #单笔冻结资金 = 历史金额*历史数量+当次交易总金额/(所有交易总数量)
@@ -761,8 +767,8 @@ class QA_Account_Future(QA_Worker):
                     self.frozen[code][trade_towards].append(frozendic)  #添加交易字典
                     self.cash.append(self.cash[-1]-_trade_money_frozen)
                     #现金减少更新
-                    self.future_hold[code][trade_towards].append([trade_price,trade_amount,commission_fee])
-                    print(self.future_hold)  #打印持仓列表
+                    # self.future_hold[code][trade_towards].append([trade_price,trade_amount,commission_fee])
+                    # print(self.future_hold)  #打印持仓列表
 
                 elif trade_towards in [ORDER_DIRECTION.BUY_CLOSE, ORDER_DIRECTION.SELL_CLOSE]:
                     # 平仓单释放现金
@@ -774,37 +780,57 @@ class QA_Account_Future(QA_Worker):
                         # self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] -= trade_amount
                         #TODO:需要计算平仓盈亏问题？-ZHOUJI
                         buy_close_profit = 0
-                        start_loop = True
-                        while start_loop:
-                            for sell_price, sell_money, sell_volume, sell_frozen, sell_commission, sell_amount in self.future_hold[code][ORDER_DIRECTION.SELL_OPEN]:
-                                sell_frozendic = self.frozen[code][ORDER_DIRECTION.SELL_OPEN][0]
-                                if sell_volume> trade_amount:
+                        start_loop_sell = True
+                        while start_loop_sell:
+                            list_dic = self.frozen[code][ORDER_DIRECTION.SELL_OPEN]
+                            for sell_frozendic in self.frozen[code][ORDER_DIRECTION.SELL_OPEN]:
+                                if sell_frozendic['sell_volume']>= trade_amount:
                                     sell_frozendic['sell_volume'] -= trade_amount
                                     sell_frozendic['sell_amount'] -= trade_amount
-                                    buy_close_profit = sell_frozen+(trade_price-sell_price)*trade_amount-sell_commission-commission_fee
-                                    start_loop = False
-                                if sell_volume <= trade_amount:
-                                    buy_close_profit = sell_frozen + (trade_price - sell_price) * trade_amount - sell_commission - commission_fee
-                                    tade_amount = trade_amount-sell_volume
-                                    self.future_hold[code][ORDER_DIRECTION.SELL_OPEN]:
-                                    sell_frozendic['sell_volume'] -= trade_amount
-                                    sell_frozendic['sell_amount'] -= trade_amount
-                                    buy_close_profit = sell_frozen + (trade_price - sell_price) * trade_amount - sell_commission - commission_fee
+                                    buy_close_profit = sell_frozendic['frozen'] + (trade_price-sell_frozendic['tradeprice'])*trade_amount-sell_frozendic['commission']-commission_fee + buy_close_profit
+                                    if(sell_frozendic['sell_volume']==0):
+                                        list_dic.pop(0)
+                                    start_loop_sell = False
+                                if sell_volume < trade_amount:
+                                    buy_close_profit = sell_frozen + (
+                                                trade_price - sell_price) * trade_amount - sell_commission - commission_fee + buy_close_profit
+                                    trade_amount = trade_amount-sell_volume
+                                    sell_frozendic.pop(0)
 
                         self.cash.append(self.cash[-1]+buy_close_profit)  #+profit??) #资金占用=余额-保证金
-                        if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
-                            self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] = 0
+                        # if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
+                        #     self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] = 0
 
                     elif trade_towards == ORDER_DIRECTION.SELL_CLOSE:# 卖出平仓  之前是多开
                         # self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] -= trade_money
-                        self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] -= trade_amount
-                        self.cash.append(
-                            self.cash[-1]-_trade_money_frozen)  #使用保证金交易
-                        if self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] == 0:
-                            self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] = 0
-            else:
-                self.cash.append(self.cash[-1]-_trade_money_frozen) #修改为保证金交易
-                self.cash_available = self.cash[-1]
+            #             self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] -= trade_amount
+            #             self.cash.append(
+            #                 self.cash[-1]-_trade_money_frozen)  #使用保证金交易
+            #             if self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] == 0:
+            #                 self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] = 0
+            # else:
+            #     self.cash.append(self.cash[-1]-_trade_money_frozen) #修改为保证金交易
+                        sell_close_profit = 0
+                        start_loop_buy = True
+                        while start_loop:
+                            for buy_price, buy_money, buy_volume, buy_frozen, buy_commission, buy_amount in self.frozen[code][ORDER_DIRECTION.BUY_OPEN]:
+                                buy_frozendic = self.frozen[code][ORDER_DIRECTION.BUY_OPEN]
+                                if buy_volume >= trade_amount:
+                                    buy_frozendic[0]['buy_volume'] -= trade_amount
+                                    buy_frozendic[0]['buy_amount'] -= trade_amount
+                                    sell_close_profit = buy_frozen + (
+                                                trade_price - buy_price) * trade_amount - buy_commission - commission_fee + buy_frozen + sell_close_profit
+                                    if (buy_frozendic['sell_volume'] == 0):
+                                        buy_frozendic.pop(0)
+                                    start_loop = False
+                                if buy_volume < trade_amount:
+                                    sell_close_profit = buy_frozen + (
+                                            trade_price - buy_price) * trade_amount - buy_commission - commission_fee + buy_frozen + sell_close_profit
+                                    trade_amount = trade_amount - buy_volume
+                                    buy_frozendic.pop(0)
+
+                        self.cash.append(self.cash[-1] + sell_close_profit)
+            self.cash_available = self.cash[-1]
 
             self.history.append(
                 [trade_time, code, trade_price, market_towards*trade_amount, self.cash[-1], order_id, realorder_id, trade_id, self.account_cookie,
