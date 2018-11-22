@@ -704,13 +704,14 @@ class QA_Account_Future(QA_Worker):
 
             tax_fee = 0  # 买入不收印花税
 
-        _trade_money_frozen = abs(trade_money)* marginrate + commission_fee+ tax_fee
-        if trade_money<=0:
-            trade_money -= (commission_fee+tax_fee)
+        _trade_money_frozen = abs(trade_money) * marginrate
+        #冻结算好
+        if trade_money <= 0:
+            trade_money = trade_money - (commission_fee+tax_fee)
         else:
-            trade_money += (commission_fee+tax_fee)
+            trade_money = trade_money + (commission_fee+tax_fee)
 
-        if self.cash[-1] > abs(_trade_money_frozen) :  #保证金+手续费>资金余额
+        if self.cash[-1] > (abs(_trade_money_frozen)-commission_fee) :  #保证金+手续费>资金余额
             self.time_index.append(trade_time)
             # TODO: 目前还不支持期货的锁仓
             if self.allow_sellopen:
@@ -765,7 +766,7 @@ class QA_Account_Future(QA_Worker):
                         #交易笔数更新
                     #self.frozen[code][trade_towards]['trade_price'] = trade_price  #可能要算个持仓均价
                     self.frozen[code][trade_towards].append(frozendic)  #添加交易字典
-                    self.cash.append(self.cash[-1]-_trade_money_frozen)
+                    self.cash.append(self.cash[-1]-_trade_money_frozen-commission_fee)
                     #现金减少更新
                     # self.future_hold[code][trade_towards].append([trade_price,trade_amount,commission_fee])
                     # print(self.future_hold)  #打印持仓列表
@@ -787,15 +788,16 @@ class QA_Account_Future(QA_Worker):
                                 if sell_frozendic['volume']>= trade_amount:
                                     sell_frozendic['volume'] -= trade_amount
                                     sell_frozendic['amount'] -= trade_amount
-                                    buy_close_profit = sell_frozendic['frozen'] + (trade_price-sell_frozendic['trade_price'])*trade_amount-sell_frozendic['commission']-commission_fee + buy_close_profit
+                                    buy_close_profit = sell_frozendic['frozen'] - (trade_price-sell_frozendic['trade_price'])*trade_amount-commission_fee + buy_close_profit
                                     if(sell_frozendic['volume']==0):
                                         list_dic.pop(0)
                                     start_loop_sell = False
+                                    break  #跳出循环
                                 if sell_frozendic['volume'] < trade_amount:
-                                    buy_close_profit = sell_frozendic['frozen'] + (
-                                                trade_price - sell_frozendic['trade_price']) * trade_amount - sell_frozendic['commission'] - commission_fee + buy_close_profit
+                                    buy_close_profit = sell_frozendic['frozen'] - (
+                                                trade_price - sell_frozendic['trade_price']) * trade_amount -  commission_fee + buy_close_profit
                                     trade_amount = trade_amount-sell_frozendic['volume']
-                                    sell_frozendic.pop(0)
+                                    list_dic.pop(0)
 
                         self.cash.append(self.cash[-1]+buy_close_profit)  #+profit??) #资金占用=余额-保证金
                         # if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
@@ -820,15 +822,16 @@ class QA_Account_Future(QA_Worker):
                                     buy_frozendic['volume'] -= trade_amount
                                     buy_frozendic['amount'] -= trade_amount
                                     sell_close_profit = buy_frozendic['frozen'] + (
-                                                trade_price - buy_frozendic['trade_price']) * trade_amount - buy_frozendic['commission'] - commission_fee  + sell_close_profit
+                                                trade_price - buy_frozendic['trade_price']) * trade_amount  - commission_fee  + sell_close_profit
                                     if (buy_frozendic['volume'] == 0):
                                         buy_frozendic_list.pop(0)
                                     start_loop_buy = False
+                                    break
                                 if buy_frozendic['volume'] < trade_amount:
                                     sell_close_profit = buy_frozendic['frozen'] + (
-                                            trade_price - buy_frozendic['trade_price']) * trade_amount - buy_frozendic['commission'] - commission_fee  + sell_close_profit
+                                            trade_price - buy_frozendic['trade_price']) * trade_amount - commission_fee  + sell_close_profit
                                     trade_amount = trade_amount - buy_frozendic['volume']
-                                    buy_frozendic.pop(0)
+                                    buy_frozendic_list.pop(0)
 
                         self.cash.append(self.cash[-1] + sell_close_profit)
             self.cash_available = self.cash[-1]
