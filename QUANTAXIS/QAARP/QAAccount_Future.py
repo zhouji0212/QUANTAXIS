@@ -745,7 +745,7 @@ class QA_Account_Future(QA_Worker):
                     else:
                         temp_amount = self.frozen[code][trade_towards][-1]['amount'] + trade_amount
                     frozendic = {
-                        'trade_prce': trade_price,
+                        'trade_price': trade_price,
                         'money': trade_money,
                         'volume': trade_amount,
                         'frozen': _trade_money_frozen,
@@ -787,13 +787,13 @@ class QA_Account_Future(QA_Worker):
                                 if sell_frozendic['volume']>= trade_amount:
                                     sell_frozendic['volume'] -= trade_amount
                                     sell_frozendic['amount'] -= trade_amount
-                                    buy_close_profit = sell_frozendic['frozen'] + (trade_price-sell_frozendic['tradeprice'])*trade_amount-sell_frozendic['commission']-commission_fee + buy_close_profit
-                                    if(sell_frozendic['sell_volume']==0):
+                                    buy_close_profit = sell_frozendic['frozen'] + (trade_price-sell_frozendic['trade_price'])*trade_amount-sell_frozendic['commission']-commission_fee + buy_close_profit
+                                    if(sell_frozendic['volume']==0):
                                         list_dic.pop(0)
                                     start_loop_sell = False
                                 if sell_frozendic['volume'] < trade_amount:
                                     buy_close_profit = sell_frozendic['frozen'] + (
-                                                trade_price - sell_frozendic['tradeprice']) * trade_amount - sell_frozendic['commission'] - commission_fee + buy_close_profit
+                                                trade_price - sell_frozendic['trade_price']) * trade_amount - sell_frozendic['commission'] - commission_fee + buy_close_profit
                                     trade_amount = trade_amount-sell_frozendic['volume']
                                     sell_frozendic.pop(0)
 
