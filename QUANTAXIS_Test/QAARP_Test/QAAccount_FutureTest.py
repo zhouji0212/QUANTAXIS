@@ -1,0 +1,42 @@
+import random as rnd
+import unittest
+
+import QUANTAXIS as QA
+from QUANTAXIS.QAARP.QAAccount_Future import QA_Account_Future
+
+
+class Test_FutureAccount(unittest.TestCase):
+
+    def test_future(self):
+        b = QA.QA_BacktestBroker()
+        data = QA.QA_fetch_future_day_adv('RBL8','2018-10-30','2018-11-04')
+        account = QA_Account_Future(init_cash=100000,allow_sellopen=True, allow_t0=True,
+                        account_cookie='testaccount',market_type=QA.MARKET_TYPE.FUTURE_CN,
+                         frequence=QA.FREQUENCE.DAY)
+        buy_sell = [QA.ORDER_DIRECTION.SELL_OPEN,QA.ORDER_DIRECTION.BUY_CLOSE,QA.ORDER_DIRECTION.BUY_OPEN,QA.ORDER_DIRECTION.SELL_CLOSE]
+        i = 0
+        for items in data.panel_gen:
+            for item in items.security_gen:
+
+                date = item.index
+                order = account.send_order(
+                    code=item.index[0][1],
+                    time=item.index[0][0],
+                    towards= buy_sell[i],
+                    price=item.get('close')[0],
+                    order_model=QA.ORDER_MODEL.CLOSE,
+                    amount_model=QA.AMOUNT_MODEL.BY_AMOUNT,
+                    amount=1
+                )
+                event = QA.QA_Event(order= order,market_data=item)
+                print(event)
+                print(b.receive_order(event))
+                trade_msg = b.query_orders(account.account_cookie,'filled')
+                res = trade_msg.loc[order.account_cookie,order.realorder_id]
+                print(res)
+                #order.trade(res.trade_id,res.trade_price,res.trade_ammount,res.trade_time)
+                account.receive_deal(res.code, res.trade_id, str(i), str(i),
+                              res.trade_price, res.trade_amount, res.towards, res.trade_time)
+                i =i+1
+                account.settle()
+        print(account.history_table)
