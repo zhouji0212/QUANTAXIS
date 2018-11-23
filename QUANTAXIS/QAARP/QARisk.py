@@ -120,7 +120,7 @@ class QA_Risk():
         else:
             self._assets = self.account.daily_cash.set_index(
                 'date').cash.fillna(method='pad')
-
+#TODO:要在ACCOUNT类中加强结算部分代码，结算需要每日可用资金+保证金
         self.time_gap = QA_util_get_trade_gap(
             self.account.start_date, self.account.end_date)
         self.init_cash = self.account.init_cash

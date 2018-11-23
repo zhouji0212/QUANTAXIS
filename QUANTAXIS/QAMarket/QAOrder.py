@@ -61,7 +61,7 @@ class QA_Order():
 
     def __init__(self, price=None, date=None, datetime=None, sending_time=None, trade_time=False, amount=None, market_type=None, frequence=None,
                  towards=None, code=None, user=None, account_cookie=None, strategy=None, order_model=None, money=None, amount_model=AMOUNT_MODEL.BY_AMOUNT,
-                 order_id=None, trade_id=False, _status=ORDER_STATUS.NEW, callback=False, commission_coeff=0.00025, tax_coeff=0.001, *args, **kwargs):
+                 order_id=None, trade_id=False, _status=ORDER_STATUS.NEW, callback=False, commission_coeff=0.00025, tax_coeff=0.001, margin=1, *args, **kwargs):
         '''
 
 
@@ -149,7 +149,7 @@ class QA_Order():
         self.callback = callback  # 委托成功的callback
         self.money = money  # 委托需要的金钱
         self.reason = None  # 原因列表
-
+        self.margin = margin # 保证金率
         self._status = _status
         
         # 增加订单对于多账户以及多级别账户的支持 2018/11/12
@@ -242,6 +242,35 @@ class QA_Order():
                 self.trade_time.append(trade_time)
                 self.callback(self.code, trade_id, self.order_id, self.realorder_id,
                               trade_price, trade_amount, self.towards, trade_time)
+            else:
+                pass
+
+    def trade_future(self, trade_id, trade_price, trade_amount, trade_time, margin=1):
+        """future_trade 方法，用于回调ORDER
+
+        Arguments:
+            amount {[type]} -- [description]
+        """
+
+        trade_amount = int(trade_amount)
+        trade_id = str(trade_id)
+
+        if trade_amount < 1:
+
+            self._status = ORDER_STATUS.NEXT
+        else:
+            if trade_id not in self.trade_id:
+                trade_price = float(trade_price)
+
+                trade_time = str(trade_time)
+
+                self.trade_id.append(trade_id)
+                self.trade_price = (self.trade_price*self.trade_amount +
+                                    trade_price*trade_amount)/(self.trade_amount+trade_amount)
+                self.trade_amount += trade_amount
+                self.trade_time.append(trade_time)
+                self.callback(self.code, trade_id, self.order_id, self.realorder_id,
+                              trade_price, trade_amount, self.towards, trade_time, margin)
             else:
                 pass
 

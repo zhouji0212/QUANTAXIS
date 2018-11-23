@@ -132,7 +132,7 @@ class RUNNING_ENVIRONMENT():
     TZERO = 't0'
     REAL = 'real'
     RANDOM = 'random'
-
+    FUTUREBACKTEST = ''
 
 class TRADE_STATUS():
     """交易状态返回值
