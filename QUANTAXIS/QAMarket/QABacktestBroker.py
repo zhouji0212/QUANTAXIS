@@ -213,7 +213,8 @@ class QA_BacktestBroker(QA_Broker):
         if status == '':
             return self.dealer.deal_df.query('account_cookie=="{}"'.format(account)).loc[:, self.orderstatus_headers].set_index(['account_cookie', 'realorder_id'])
         elif status == 'filled':
-            return self.dealer.deal_df.query('account_cookie=="{}"'.format(account)).loc[:, self.dealstatus_headers].set_index(['account_cookie', 'realorder_id'])
+            return self.dealer.deal_df.query('account_cookie=="{}"'.format(account)).loc[:, self.dealstatus_headers].set_index(['account_cookie', 'realorder_id']).iloc[-1]
+            #修改同个COOKIES 多个成交的问题
         elif status == 'open':
             pass
 

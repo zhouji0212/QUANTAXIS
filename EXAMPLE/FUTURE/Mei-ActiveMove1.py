@@ -41,8 +41,8 @@ tempprice = 2.2
 #3个一起跑下
 
 Account = QA.QA_Account(init_cash=init_cash,allow_sellopen=True, allow_t0=True,
-                        account_cookie=cookie,market_type=QA.MARKET_TYPE.FUTURE_CN,
-                         frequence=QA.FREQUENCE.FIFTEEN_MIN)
+                        market_type=QA.MARKET_TYPE.FUTURE_CN,
+                         frequence=QA.FREQUENCE.DAY)
 Broker = QA.QA_BacktestBroker()
 
 
@@ -67,7 +67,7 @@ def GetMa(dataframe,short=5,long=60):
 
 
 def Buy_Open(day_product,volume,price):
-    return Account.send_order(
+    return Account.send_order_future(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount= volume,
@@ -79,7 +79,7 @@ def Buy_Open(day_product,volume,price):
 
 
 def Sell_Close(day_product,volume,price):
-    return Account.send_order(
+    return Account.send_order_future(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -90,7 +90,7 @@ def Sell_Close(day_product,volume,price):
     )
 
 def Sell_Open(day_product,volume,price):
-    return Account.send_order(
+    return Account.send_order_future(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -101,7 +101,7 @@ def Sell_Open(day_product,volume,price):
     )
 
 def Buy_Close(day_product,volume,price):
-    return Account.send_order(
+    return Account.send_order_future(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -111,13 +111,13 @@ def Buy_Close(day_product,volume,price):
         amount_model=QA.AMOUNT_MODEL.BY_AMOUNT
     )
 
-def SendOrder(order,day_product,margin):
+def SendOrder(order,day_product):
     event = QA.QA_Event(order=order, market_data=day_product)
     rec_msg = Broker.receive_order(event)
-    trade_mes = Broker.query_orders(Account.account_cookie, 'filled')
-    res = trade_mes.loc[order.account_cookie, order.realorder_id]
-    msg = order.trade_future(res.trade_id, res.trade_price, res.trade_amount, res.trade_time, margin)
-    print(msg)
+    trade_mes = Broker.query_orders(Account.account_cookie,'filled')
+
+    msg = order.trade_future(trade_mes.trade_id, trade_mes.trade_price, trade_mes.trade_amount, trade_mes.trade_time)
+    print('sendorder',msg)
 
 def GetPosition(Account,day_product):
     return Account.hold_available.get(day_product.index[0][1], 0)
@@ -138,11 +138,13 @@ def main(openprice):
        test_data [pr] = np.empty(0)
 
     #通过循环跑回测
+    _date = None
     for day_products in DayData.panel_gen:
-        _date = None
+
         if _date != day_products.date[0]:
-            print('try to settle')
+
             _date = day_products.date[0]
+            print(str(_date), 'try to settle')
             Account.settle()  # 每天需要结算
         for day_product in day_products.security_gen:
             # day = day_product.date[0]
@@ -152,13 +154,13 @@ def main(openprice):
             close = day_product.close[0]
             if len(test_data[code])>1:
                 max,min = GetMaxMini(test_data[code],len(test_data[code]))
-                if abs(max[-1]/openprice-1)>= floatrate:
-                    print(max[-1])
+                if abs(min[-1]/openprice-1)>= floatrate:
+                    print(min[-1])
                     position = GetPosition(Account,day_product)
                     if abs(position)!=0:
                        order = Sell_Close(day_product,volume,close)
                        print(order)
-                       SendOrder(order,day_product,margin)
+                       SendOrder(order,day_product)
                     else:
                         order = Sell_Open(day_product,volume,close)
                         print(order)
@@ -171,7 +173,7 @@ def main(openprice):
                     if abs(position) != 0:
                         order = Buy_Close(day_product, volume, close)
                         print(order)
-                        SendOrder(order,day_product,margin)
+                        SendOrder(order,day_product)
                     else:
                         order = Buy_Open(day_product, volume, close)
                         print(order)
@@ -182,7 +184,7 @@ def main(openprice):
             if len(test_data[code])<2:
                 order = Buy_Open(day_product,volume,close)
                 print(order)
-                SendOrder(order,day_product,margin)
+                SendOrder(order,day_product)
 
             test_data[code] = np.append(test_data[code],close)
     Account.settle()

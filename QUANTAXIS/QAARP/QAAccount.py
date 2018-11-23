@@ -98,7 +98,7 @@ class QA_Account(QA_Worker):
     def __init__(self, strategy_name=None, user_cookie=None, portfolio_cookie=None, account_cookie=None,
                  market_type=MARKET_TYPE.STOCK_CN, frequence=FREQUENCE.DAY, broker=BROKER_TYPE.BACKETEST,
                  init_hold={}, init_cash=1000000, commission_coeff=0.00025, tax_coeff=0.001,
-                 margin_level=False, allow_t0=False, allow_sellopen=False,
+                 margin_rate=1.0, allow_t0=False, allow_sellopen=False,
                  running_environment=RUNNING_ENVIRONMENT.BACKETEST):
         """
 
@@ -112,7 +112,7 @@ class QA_Account(QA_Worker):
         :param [float] commission_coeff:  交易佣金 :默认 万2.5   float 类型
         :param [float] tax_coeff:         印花税   :默认 千1.5   float 类型
 
-        :param [Bool] margin_level:      保证金比例 默认False
+        :param [float] margin_rate:      保证金比例 默认1.0
         :param [Bool] allow_t0:          是否允许t+0交易  默认False
         :param [Bool] allow_sellopen:    是否允许卖空开仓  默认False
 
@@ -213,7 +213,7 @@ class QA_Account(QA_Worker):
         self.buy_available = copy.deepcopy(self.init_hold)
         self.history = []
         self.time_index = []
-        self.future_total_hold = [] #期货总持仓
+
         ########################################################################
         # 规则类
         # 1.是否允许t+0 及买入及结算
@@ -224,7 +224,9 @@ class QA_Account(QA_Worker):
         #
         self.allow_t0 = allow_t0
         self.allow_sellopen = allow_sellopen
-        self.margin_level = margin_level  # 保证金比例
+        self.margin_rate = margin_rate  # 保证金比例 默认为1.0
+        self.future_total_hold = []  # 期货总持仓
+        self.future_asset = [] #每日资产
         """期货的多开/空开 ==> 资金冻结进保证金  frozen
 
         对应平仓的时候, 释放保证金
@@ -253,7 +255,7 @@ class QA_Account(QA_Worker):
             'current_time': str(self._currenttime),
             'allow_sellopen': self.allow_sellopen,
             'allow_t0': self.allow_t0,
-            'margin_level': self.margin_level,
+            'margin_rate': self.margin_rate,
             'init_assets': self.init_assets,
             'init_cash': self.init_cash,
             'init_hold': self.init_hold.to_dict(),
@@ -782,7 +784,7 @@ class QA_Account(QA_Worker):
 
 
 
-    def receive_deal_future(self, code: str, trade_id: str, order_id: str, realorder_id: str, trade_price: float, trade_amount: int, trade_towards: int, trade_time: str, message=None, marginrate = 1):
+    def receive_deal_future(self, code: str, trade_id: str, order_id: str, realorder_id: str, trade_price: float, trade_amount: int, trade_towards: int, trade_time: str, message=None):
         """期货交易类
 
         Arguments:
@@ -799,7 +801,7 @@ class QA_Account(QA_Worker):
             [type] -- [description]
         """
 
-        print('receive deal')
+        print('receive future deal')
 
         trade_time = str(trade_time)
         code = str(code)
@@ -813,6 +815,7 @@ class QA_Account(QA_Worker):
         market_towards = 1 if trade_towards > 0 else -1
         trade_money = trade_price*trade_amount*market_towards
         commission_fee = trade_money*self.commission_coeff
+        future_hold = 0
 
         if self.market_type == MARKET_TYPE.STOCK_CN:
             if trade_towards > 0:
@@ -850,7 +853,7 @@ class QA_Account(QA_Worker):
 
             tax_fee = 0  # 买入不收印花税
 
-        _trade_money_frozen = abs(trade_money) * marginrate
+        _trade_money_frozen = abs(trade_money) * self.margin_rate
         #冻结资金算法
         if trade_money <= 0:
             trade_money = trade_money - (commission_fee+tax_fee)
@@ -934,6 +937,9 @@ class QA_Account(QA_Worker):
                         #TODO:需要计算平仓盈亏问题？-ZHOUJI
                         buy_close_profit = 0
                         start_loop_sell = True
+                        if len(self.frozen[code][ORDER_DIRECTION.SELL_OPEN])==0:
+                            start_loop_sell = False
+                            sell_open_dic = { }
                         while start_loop_sell:
                             list_dic = self.frozen[code][ORDER_DIRECTION.SELL_OPEN]
                             for sell_frozendic in self.frozen[code][ORDER_DIRECTION.SELL_OPEN]:
@@ -958,6 +964,7 @@ class QA_Account(QA_Worker):
 
                         self.cash.append(self.cash[-1]+buy_close_profit)  #+profit??) #资金占用=余额-保证金
                         self.future_total_hold.append(sell_open_dic)
+
                         # if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
                         #     self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] = 0
 
@@ -972,6 +979,9 @@ class QA_Account(QA_Worker):
             #     self.cash.append(self.cash[-1]-_trade_money_frozen) #修改为保证金交易
                         sell_close_profit = 0
                         start_loop_buy = True
+                        if (len(self.frozen[code][ORDER_DIRECTION.BUY_OPEN]))==0:
+                            start_loop_buy = False
+                            buy_open_dic = {}
                         while start_loop_buy:
                             buy_frozendic_list = self.frozen[code][ORDER_DIRECTION.BUY_OPEN]
                             for buy_frozendic in self.frozen[code][ORDER_DIRECTION.BUY_OPEN]:
@@ -999,10 +1009,14 @@ class QA_Account(QA_Worker):
                         self.cash.append(self.cash[-1] + sell_close_profit)
                         self.future_total_hold.append(buy_open_dic)
             self.cash_available = self.cash[-1]
+            if(len(self.future_total_hold[-1])==0):
+                future_hold = 0
+            else:
+                future_hold = self.future_total_hold[-1]['hold_amount']
 
             self.history.append(
                 [trade_time, code, trade_price, market_towards*trade_amount, self.cash[-1], order_id, realorder_id, trade_id, self.account_cookie,
-                    commission_fee, tax_fee, market_towards*self.future_total_hold[-1]['hold_amount'], message])
+                    commission_fee, tax_fee, market_towards*future_hold, message])
             if self.allow_t0:
 
                 self.sell_available = self.hold
@@ -1170,7 +1184,7 @@ class QA_Account(QA_Worker):
                 code, time, amount, towards))
             return False
 
-    def send_order_future(self, code=None, amount=None, time=None, towards=None, price=None, money=None, order_model=None, amount_model=None,margin=1, *args, **kwargs):
+    def send_order_future(self, code=None, amount=None, time=None, towards=None, price=None, money=None, order_model=None, amount_model=None, *args, **kwargs):
         """
         ATTENTION CHANGELOG 1.0.28
         修改了Account的send_order方法, 区分按数量下单和按金额下单两种方式
@@ -1314,6 +1328,7 @@ class QA_Account(QA_Worker):
                               date=date, datetime=time, sending_time=time, callback=self.receive_deal_future,
                               amount=amount, price=price, order_model=order_model, towards=towards, money=money,
                               amount_model=amount_model, commission_coeff=self.commission_coeff, tax_coeff=self.tax_coeff,*args, **kwargs)  # init
+            print(_order)
             # 历史委托order状态存储， 保存到 QA_Order 对象中的队列中
             self.datetime = time
             self.orders.insert_order(_order)
@@ -1381,6 +1396,7 @@ class QA_Account(QA_Worker):
         '''专门用于期货的结算'''
         pass
 
+
     def on_bar(self, event):
         '''
         策略事件
@@ -1414,7 +1430,7 @@ class QA_Account(QA_Worker):
         self._currenttime = message.get('current_time', None)
         self.allow_sellopen = message.get('allow_sellopen', False)
         self.allow_t0 = message.get('allow_t0', False)
-        self.margin_level = message.get('margin_level', False)
+        self.margin_rate = message.get('margin_rate', 1.0)
         self.init_cash = message.get(
             'init_cash', message.get('init_assets', 1000000))  # 兼容修改
         self.init_hold = pd.Series(message.get('init_hold', {}), name='amount')
@@ -1541,5 +1557,5 @@ class Account_handler():
 
 
 if __name__ == '__main__':
-    account = QA_Account_Future()
+    account = QA_Account()
     # 创建一个account账户

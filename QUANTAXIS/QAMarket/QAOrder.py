@@ -245,7 +245,7 @@ class QA_Order():
             else:
                 pass
 
-    def trade_future(self, trade_id, trade_price, trade_amount, trade_time, margin=1):
+    def trade_future(self, trade_id, trade_price, trade_amount, trade_time):
         """future_trade 方法，用于回调ORDER
 
         Arguments:
@@ -270,7 +270,7 @@ class QA_Order():
                 self.trade_amount += trade_amount
                 self.trade_time.append(trade_time)
                 self.callback(self.code, trade_id, self.order_id, self.realorder_id,
-                              trade_price, trade_amount, self.towards, trade_time, margin)
+                              trade_price, trade_amount, self.towards, trade_time, self.margin)
             else:
                 pass
 
