@@ -1029,6 +1029,8 @@ class QA_Account(QA_Worker):
                 future_hold = 0
             else:
                 future_hold = self.future_total_hold[-1]['hold_amount']
+                #数据结构需要改进。。。。
+                #TODO:期货持仓的列表 数据结构要改下--2018-11-24
 
             self.history.append(
                 [trade_time, code, trade_price, market_towards*trade_amount, self.cash[-1], order_id, realorder_id, trade_id, self.account_cookie,
