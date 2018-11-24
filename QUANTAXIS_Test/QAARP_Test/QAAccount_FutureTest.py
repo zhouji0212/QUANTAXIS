@@ -10,8 +10,8 @@ class Test_FutureAccount(unittest.TestCase):
         b = QA.QA_BacktestBroker()
         data = QA.QA_fetch_future_day_adv('RBL8','2018-10-20','2018-11-04')
         account = QA.QA_Account(init_cash=100000,allow_sellopen=True, allow_t0=True,
-                        account_cookie='testaccount',market_type=QA.MARKET_TYPE.FUTURE_CN,
-                         frequence=QA.FREQUENCE.DAY,margin_rate=0.1)
+                            market_type=QA.MARKET_TYPE.FUTURE_CN,
+                            frequence=QA.FREQUENCE.DAY,margin_rate=0.1)
         buy_sell = [QA.ORDER_DIRECTION.SELL_OPEN,QA.ORDER_DIRECTION.BUY_CLOSE,QA.ORDER_DIRECTION.BUY_OPEN,QA.ORDER_DIRECTION.SELL_CLOSE]
         i = 0
         for items in data.panel_gen:
@@ -34,7 +34,7 @@ class Test_FutureAccount(unittest.TestCase):
                 res = trade_msg.loc[order.account_cookie,order.realorder_id]
                 print(res)
                 #order.trade(res.trade_id,res.trade_price,res.trade_ammount,res.trade_time)
-                account.receive_deal_future(res.code, res.trade_id, str(i), str(i),
+                account.receive_deal(res.code, res.trade_id, str(i), str(i),
                               res.trade_price, res.trade_amount, res.towards, res.trade_time)
                 i =i+1
                 account.settle()

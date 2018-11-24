@@ -8,7 +8,7 @@ import datetime
 import numpy as np
 import talib as ta
 
-starttime = datetime.date(2018, 10, 16)
+starttime = datetime.date(2018, 1, 16)
 endtime = datetime.date(2018, 11, 10)
 strstartday = str(starttime - datetime.timedelta(days=1))
 strstartmaday = str(starttime - datetime.timedelta(days=90))
@@ -26,7 +26,7 @@ volume = 10  # 手数
 logdic = {}
 
 openprice = 1.24
-floatrate = 0.1
+floatrate = 0.05
 
 tempprice = 2.2
 
@@ -67,7 +67,7 @@ def GetMa(dataframe,short=5,long=60):
 
 
 def Buy_Open(day_product,volume,price):
-    return Account.send_order_future(
+    return Account.send_order(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount= volume,
@@ -79,7 +79,7 @@ def Buy_Open(day_product,volume,price):
 
 
 def Sell_Close(day_product,volume,price):
-    return Account.send_order_future(
+    return Account.send_order(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -90,7 +90,7 @@ def Sell_Close(day_product,volume,price):
     )
 
 def Sell_Open(day_product,volume,price):
-    return Account.send_order_future(
+    return Account.send_order(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -101,7 +101,7 @@ def Sell_Open(day_product,volume,price):
     )
 
 def Buy_Close(day_product,volume,price):
-    return Account.send_order_future(
+    return Account.send_order(
         code=day_product.index[0][1],
         time=day_product.index[0][0],
         amount=volume,
@@ -115,8 +115,8 @@ def SendOrder(order,day_product):
     event = QA.QA_Event(order=order, market_data=day_product)
     rec_msg = Broker.receive_order(event)
     trade_mes = Broker.query_orders(Account.account_cookie,'filled')
-
-    msg = order.trade_future(trade_mes.trade_id, trade_mes.trade_price, trade_mes.trade_amount, trade_mes.trade_time)
+    res = trade_mes.iloc[0]
+    msg = order.trade(res.trade_id, res.trade_price, res.trade_amount, res.trade_time)
     print('sendorder',msg)
 
 def GetPosition(Account,day_product):
@@ -153,9 +153,10 @@ def main(openprice):
 
             close = day_product.close[0]
             if len(test_data[code])>1:
-                max,min = GetMaxMini(test_data[code],len(test_data[code]))
-                if abs(min[-1]/openprice-1)>= floatrate:
-                    print(min[-1])
+                min,max = GetMaxMini(test_data[code],len(test_data[code]))
+                print('mini、max、Open、lowrate、highrate ：',min[-1],max[-1], openprice, min[-1]/openprice-1,max[-1]/openprice-1)
+                if -(min[-1]/openprice-1)>= floatrate:
+                    print('mini:',min[-1],-(min[-1]/openprice-1))
                     position = GetPosition(Account,day_product)
                     if abs(position)!=0:
                        order = Sell_Close(day_product,volume,close)
@@ -167,8 +168,8 @@ def main(openprice):
                         test_data[code]=np.empty(0)
                         # test_data[code]=np.append(test_data,close)
                         openprice = close
-                if abs(max[-1]/openprice-1)>= floatrate:
-                    print(max[-1])
+                if (max[-1]/openprice-1)>= floatrate:
+                    print('max:',max[-1],max[-1]/openprice-1)
                     position = GetPosition(Account, day_product)
                     if abs(position) != 0:
                         order = Buy_Close(day_product, volume, close)
@@ -177,7 +178,7 @@ def main(openprice):
                     else:
                         order = Buy_Open(day_product, volume, close)
                         print(order)
-                        SendOrder(order,day_product,volume)
+                        SendOrder(order,day_product)
                         test_data[code] = np.empty(0)
                         # test_data[code] = np.append(test_data[code], close)
                         openprice = close
@@ -185,6 +186,7 @@ def main(openprice):
                 order = Buy_Open(day_product,volume,close)
                 print(order)
                 SendOrder(order,day_product)
+                openprice = close
 
             test_data[code] = np.append(test_data[code],close)
     Account.settle()
@@ -194,7 +196,7 @@ def main(openprice):
     Risk = QA.QA_Risk(Account,market_data=DayData,if_fq=False) #需要日线数据进行计算
     Account.save()
     Account.daily_hold.to_csv('hold_daily.csv')
-    Account.history_table.to_csv('history_table.csv')
+    Account.history_table.to_clipboard()
     Account.trade.to_csv('trademx.csv')
 
     Risk.assets.to_csv('asserts.csv')
