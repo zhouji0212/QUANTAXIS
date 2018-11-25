@@ -21,7 +21,7 @@ class Test_FutureAccount(unittest.TestCase):
                 order = account.send_order(
                     code=item.index[0][1],
                     time=item.index[0][0],
-                    towards= buy_sell[i%4],
+                    towards= buy_sell[i%3],
                     price=item.get('close')[0],
                     order_model=QA.ORDER_MODEL.CLOSE,
                     amount_model=QA.AMOUNT_MODEL.BY_AMOUNT,

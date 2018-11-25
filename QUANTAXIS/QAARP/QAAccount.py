@@ -227,7 +227,7 @@ class QA_Account(QA_Worker):
         self.allow_t0 = allow_t0
         self.allow_sellopen = allow_sellopen
         self.margin_rate = margin_rate  # 保证金比例 默认为1.0
-        self.future_total_hold = []  # 期货总持仓
+        self.future_total_hold = {}  # 期货总持仓
         self.future_asset = [] #每日资产
         """期货的多开/空开 ==> 资金冻结进保证金  frozen
 
@@ -890,6 +890,11 @@ class QA_Account(QA_Worker):
                             ORDER_DIRECTION.BUY_OPEN: collections.deque(),
                             ORDER_DIRECTION.SELL_OPEN: collections.deque()
                         }
+                    if code in self.future_total_hold.keys():
+                        pass
+                    else:
+                        self.future_total_hold[code] = []
+
                         # self.frozen[code][ORDER_DIRECTION.BUY_OPEN].append(
                         #     {'trade_price': 0, 'money': 0, 'volume': 0, 'frozen': 0, 'commission': 0, 'amount': 0}
                         # )
@@ -915,11 +920,7 @@ class QA_Account(QA_Worker):
                         'commission': commission_fee,
                         'amount': temp_amount  # 看看可能会有负数
                     }
-                    holddic = {
-                        'code':code,
-                        'trade_towards':trade_towards,
-                        'hold_amount':temp_amount
-                    }
+
                     # self.frozen[code][trade_towards]['frozen'] = ((self.frozen[code][trade_towards]['frozen']*self.frozen[code][trade_towards]['amount'])+_trade_money_frozen)/(self.frozen[code][trade_towards]['amount']+trade_amount)
 
                             #单笔冻结资金 = 历史金额*历史数量+当次交易总金额/(所有交易总数量)
@@ -934,7 +935,7 @@ class QA_Account(QA_Worker):
                     #self.frozen[code][trade_towards]['trade_price'] = trade_price  #可能要算个持仓均价
                     self.frozen[code][trade_towards].append(frozendic)  #添加交易字典
                     self.cash.append(self.cash[-1]-_trade_money_frozen-commission_fee)
-                    self.future_total_hold.append(holddic) #增加持仓更新
+                    self.future_total_hold[code].append(temp_amount)
                     #现金减少更新
                     # self.future_hold[code][trade_towards].append([trade_price,trade_amount,commission_fee])
                     # print(self.future_hold)  #打印持仓列表
@@ -953,21 +954,21 @@ class QA_Account(QA_Worker):
                             loop_tag = False
                         while loop_tag:
                             queue = self.frozen[code][ORDER_DIRECTION.SELL_OPEN]
-                            for sell_frozendic in self.frozen[code][ORDER_DIRECTION.SELL_OPEN]:
+                            for sell_frozendic in queue:
                                 if sell_frozendic['volume']>= trade_amount: #开仓交易数量>平仓交易数量
                                     sell_frozendic['volume'] -= trade_amount
                                     sell_frozendic['amount'] -= (temp_closeamount+trade_amount)
                                     buy_close_profit = sell_frozendic['frozen'] - (trade_price-sell_frozendic['trade_price'])*trade_amount-commission_fee + buy_close_profit
                                     if(sell_frozendic['volume']==0):
                                         queue.popleft()  #FIFO
-                                    loop_tag = False
-                                    sell_open_dic = {
-                                        'code': code,
-                                        'trade_towards': trade_towards,
-                                        'hold_amount': sell_frozendic['amount']
-                                    }
-                                    add_tag = True
-                                    break  #跳出循环
+                                loop_tag = False
+                                # sell_open_dic = {
+                                #     'code': code,
+                                #     'trade_towards': trade_towards,
+                                #     'hold_amount': sell_frozendic['amount']
+                                # }
+                                add_tag = True
+                                break  #跳出循环
                                 if sell_frozendic['volume'] < trade_amount:
                                     buy_close_profit = sell_frozendic['frozen'] - (
                                                 trade_price - sell_frozendic['trade_price']) * trade_amount -  commission_fee + buy_close_profit
@@ -976,20 +977,10 @@ class QA_Account(QA_Worker):
                                     queue.popleft()
                         if(add_tag):
                             self.cash.append(self.cash[-1]+buy_close_profit)  #+profit??) #资金占用=余额-保证金
-                            self.future_total_hold.append(sell_open_dic)
-
-                        # if self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['amount'] == 0:
-                        #     self.frozen[code][ORDER_DIRECTION.SELL_OPEN]['money'] = 0
+                            self.future_total_hold[code].append(sell_frozendic['amount'])
 
                     elif trade_towards == ORDER_DIRECTION.SELL_CLOSE:# 卖出平仓  之前是多开
-                        # self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] -= trade_money
-            #             self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] -= trade_amount
-            #             self.cash.append(
-            #                 self.cash[-1]-_trade_money_frozen)  #使用保证金交易
-            #             if self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['amount'] == 0:
-            #                 self.frozen[code][ORDER_DIRECTION.BUY_OPEN]['money'] = 0
-            # else:
-            #     self.cash.append(self.cash[-1]-_trade_money_frozen) #修改为保证金交易
+
                         sell_close_profit = 0.00
                         temp_closeamount = 0.00
                         add_tag = False
@@ -998,7 +989,7 @@ class QA_Account(QA_Worker):
                             loop_tag = False
                         while loop_tag:
                             queue = self.frozen[code][ORDER_DIRECTION.BUY_OPEN]
-                            for buy_frozendic in self.frozen[code][ORDER_DIRECTION.BUY_OPEN]:
+                            for buy_frozendic in queue:
 
                                 if buy_frozendic['volume'] >= trade_amount:
                                     buy_frozendic['volume'] -= trade_amount
@@ -1007,28 +998,26 @@ class QA_Account(QA_Worker):
                                                 trade_price - buy_frozendic['trade_price']) * trade_amount  - commission_fee  + sell_close_profit
                                     if (buy_frozendic['volume'] == 0):
                                         queue.popleft()
-                                    loop_tag = False
-                                    buy_open_dic = {
-                                        'code': code,
-                                        'trade_towards': trade_towards,
-                                        'hold_amount': buy_frozendic['amount']
-                                    }
-                                    add_tag = True
-                                    break
+                                        print('buy_open','trade_amount',trade_amount,queue)
+                                loop_tag = False
+                                add_tag = True
+                                break
+
                                 if buy_frozendic['volume'] < trade_amount:
                                     sell_close_profit = buy_frozendic['frozen'] + (
                                             trade_price - buy_frozendic['trade_price']) * trade_amount - commission_fee  + sell_close_profit
                                     trade_amount = trade_amount - buy_frozendic['volume']
                                     temp_closeamount += buy_frozendic['volume']
                                     queue.popleft()
+                                    print('buy_open2',temp_closeamount,queue)
                         if(add_tag):
                             self.cash.append(self.cash[-1] + sell_close_profit)
-                            self.future_total_hold.append(buy_open_dic)
+                            self.future_total_hold[code].append(buy_frozendic['amount'])
             self.cash_available = self.cash[-1]
-            if(len(self.future_total_hold[-1])==0):
-                future_hold = 0
-            else:
-                future_hold = self.future_total_hold[-1]['hold_amount']
+            # if(self.future_total_hold[code][-1] ==0):
+            #     future_hold = 0
+            # else:
+            future_hold = self.future_total_hold[code][-1]*market_towards
                 #数据结构需要改进。。。。
                 #TODO:期货持仓的列表 数据结构要改下--2018-11-24
 

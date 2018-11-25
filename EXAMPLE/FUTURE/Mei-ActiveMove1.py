@@ -162,6 +162,11 @@ def main(openprice):
                        order = Sell_Close(day_product,volume,close)
                        print(order)
                        SendOrder(order,day_product)
+                       order = Sell_Open(day_product, volume, close)
+                       print(order)
+                       test_data[code] = np.empty(0)
+                       # test_data[code]=np.append(test_data,close)
+                       openprice = close
                     else:
                         order = Sell_Open(day_product,volume,close)
                         print(order)
@@ -175,6 +180,12 @@ def main(openprice):
                         order = Buy_Close(day_product, volume, close)
                         print(order)
                         SendOrder(order,day_product)
+                        order = Buy_Open(day_product, volume, close)
+                        print(order)
+                        SendOrder(order, day_product)
+                        test_data[code] = np.empty(0)
+                        # test_data[code] = np.append(test_data[code], close)
+                        openprice = close
                     else:
                         order = Buy_Open(day_product, volume, close)
                         print(order)
