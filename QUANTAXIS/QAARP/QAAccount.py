@@ -1181,6 +1181,12 @@ class QA_Account(QA_Worker):
                             print('aqureMoney', money)
                             print('cash', self.cash_available)
                             print("卖空资金不足/不允许裸卖空")
+                    if towards == -3:  # 卖平
+                        print('卖出平仓发单')
+                        # if self.cash_available >= money:  # 卖空的市值小于现金（有担保的卖空）， 不允许裸卖空
+                        #     #self.cash_available -= money
+                        #     flag = True
+
             # else:
             #     print('资金股份不足/不允许卖空开仓')
 

@@ -12,17 +12,17 @@ class Test_ActiveMove():
 
     def __init__(self):
         self.starttime = datetime.date(2018, 1, 1)
-        self.endtime = datetime.date(2018, 11, 10)
+        self.endtime = datetime.date(2018, 11,10 )
         self.strstartday = str(self.starttime - datetime.timedelta(days=1))
         self.strstartmaday = str(self.starttime - datetime.timedelta(days=90))
         self.strstartmin = str(self.starttime - datetime.timedelta(days=3))
         self.strendday = str(self.endtime)
         self.strendmin = str(self.endtime)
 
-        self.init_cash = 100000
+        self.init_cash = 10000000
         self.margin = 0.1
         # products = ['MA1901', 'I1901', 'RM1901', 'TA1901']
-        self.products = ['TA1901']
+        self.products = ['I1901']
         # products = ['TA1901', 'RB1901','RM1901']
         self.cookie = '!'.join(self.products)
         self.volume = 10  # 手数
@@ -32,10 +32,11 @@ class Test_ActiveMove():
         self.floatrate = 0.05
 
         self.tempprice = 2.2
-        self.buy_position = 0
-        self.sell_position = 0
+        self.buy_position = {}
+        self.sell_position = {}
+        self.code = None
         self.temp_close = 0.00
-        self.temp_dayproduct = None
+        self.temp_dayproduct = {}
         self.Account = QA.QA_Account(init_cash=self.init_cash, allow_sellopen=True, allow_t0=True,
                                 market_type=QA.MARKET_TYPE.FUTURE_CN,
                                 frequence=QA.FREQUENCE.DAY)
@@ -159,11 +160,15 @@ class Test_ActiveMove():
                 code = day_product.index[0][1]
 
                 close = day_product.close[0]
-
+                self.temp_dayproduct[code] = day_product
+                self.temp_close = close
+                self.code = code
                 if len(test_data[code])>1:
                     min,max = self.GetMaxMini(test_data[code],len(test_data[code]))
                     buy_position = self.Account.future_hold_detail[code][QA.ORDER_DIRECTION.BUY_OPEN]
                     sell_position = self.Account.future_hold_detail[code][QA.ORDER_DIRECTION.SELL_OPEN]
+                    self.buy_position[code] = buy_position
+                    self.sell_position[code] = sell_position
                     print('mini、max、Open、lowrate、highrate ：',min[-1],max[-1], openprice, min[-1]/openprice-1,max[-1]/openprice-1)
                     if (max[-1] / close - 1) >= self.floatrate :
                         print('mini:',min[-1],-(min[-1]/openprice-1))
@@ -179,7 +184,7 @@ class Test_ActiveMove():
                             openprice = close
                             test_data[code] = np.append(test_data[code], close)
                             test_data[code] = np.append(test_data[code], close)
-
+                            self.sell_position[code] = self.Account.future_hold_detail[code][-2]
                            #
                         # elif abs(sell_position) == 0:
                         #     order = Sell_Open(day_product,volume,close)
@@ -204,6 +209,7 @@ class Test_ActiveMove():
                             test_data[code] = np.append(test_data[code], close)
                         # test_data[code] = np.append(test_data[code], close)
                             openprice = close
+                            self.buy_position[code] = self.Account.future_hold_detail[code][2]
                         # elif sell_position == 0:
                         #     order = Buy_Open(day_product, volume, close)
                         #     print(order)
@@ -222,25 +228,33 @@ class Test_ActiveMove():
                     test_data[code] = np.append(test_data[code], close)
 
                 test_data[code] = np.append(test_data[code],close)
-                self.temp_close = close
+
 
                 print(self.Account.future_hold_detail)
 
 
-
-            self.Account.settle()
-        if buy_position != 0:
-            order = self.Sell_Close()
-            self.SendOrder()
+            self.Account.settle() #ri
+        print(self.temp_close)
+        print(self.temp_dayproduct[code].data)
+        for code in self.Account.future_hold_detail.keys():
+            if self.Account.future_hold_detail[code][QA.ORDER_DIRECTION.BUY_OPEN] != 0 :
+                order = self.Sell_Close(self.temp_dayproduct[code],self.volume,self.temp_close)
+                self.SendOrder(order,self.temp_dayproduct[code])
+                self.Account.settle()
+            if self.Account.future_hold_detail[code][QA.ORDER_DIRECTION.SELL_OPEN] != 0:
+                order = self.Buy_Close(self.temp_dayproduct[code],self.volume,self.temp_close)
+                self.SendOrder(order,self.temp_dayproduct[code])
+                self.Account.settle()
 
         #print(Account.history)
+        print(self.Account.future_hold_detail)
         print(self.Account.history_table)
         print(self.Account.daily_hold)
 
         self.Account.save()
-        self.Account.daily_hold.to_csv('hold_daily.csv')
+        # self.Account.daily_hold.to_csv('hold_daily.csv')
         self.Account.history_table.to_clipboard()
-        self.Account.trade.to_csv('trademx.csv')
+        # self.Account.trade.to_csv('trademx.csv')
         # Risk = QA.QA_Risk(Account, market_data=DayData, if_fq=False)  # 需要日线数据进行计算
         # Risk.assets.to_csv('asserts.csv')
         #
@@ -251,3 +265,4 @@ class Test_ActiveMove():
 if __name__ == '__main__':
     test = Test_ActiveMove()
     test.main(1000)
+
