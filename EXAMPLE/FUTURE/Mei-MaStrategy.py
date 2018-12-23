@@ -199,13 +199,13 @@ Account.settle()
 print(Day_idx)
 print(Account.history_table)
 print(Account.daily_hold)
-Risk = QA.QA_Risk(Account,market_data=DayData,if_fq=False) #需要日线数据进行计算
+Risk = QA.QA_Risk(Account, market_data=DayData, if_fq=False, market_type='future') #需要日线数据进行计算
 Account.save()
 Account.daily_hold.to_csv('hold_daily.csv')
 Account.history_table.to_csv('history_table.csv')
 Account.trade.to_csv('trademx.csv')
 
-Risk.assets.to_csv('asserts.csv')
+# Risk.assets.to_csv('asserts.csv')
 
 plt=Risk.plot_future_assets_curve()
 

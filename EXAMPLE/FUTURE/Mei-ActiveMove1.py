@@ -19,7 +19,7 @@ class Test_ActiveMove():
         self.strendday = str(self.endtime)
         self.strendmin = str(self.endtime)
 
-        self.init_cash = 10000000
+        self.init_cash = 1000000
         self.margin = 0.1
         # products = ['MA1901', 'I1901', 'RM1901', 'TA1901']
         self.products = ['I1901']
@@ -255,12 +255,12 @@ class Test_ActiveMove():
         # self.Account.daily_hold.to_csv('hold_daily.csv')
         self.Account.history_table.to_clipboard()
         # self.Account.trade.to_csv('trademx.csv')
-        # Risk = QA.QA_Risk(Account, market_data=DayData, if_fq=False)  # 需要日线数据进行计算
+        Risk = QA.QA_Risk(self.Account, market_data=DayData, if_fq=False, market_type='future')  # 需要日线数据进行计算
         # Risk.assets.to_csv('asserts.csv')
         #
-        # plt=Risk.plot_future_assets_curve()
+        plt=Risk.plot_future_assets_curve()
         #
-        # plt.show()
+        plt.show()
 
 if __name__ == '__main__':
     test = Test_ActiveMove()
