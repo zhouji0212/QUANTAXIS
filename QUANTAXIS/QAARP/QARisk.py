@@ -93,7 +93,7 @@ class QA_Risk():
     预期PNL/统计学PNL
     """
 
-    def __init__(self, account, benchmark_code='000300', benchmark_type=MARKET_TYPE.INDEX_CN, if_fq=True, market_data=None):
+    def __init__(self, account, benchmark_code='000300', benchmark_type=MARKET_TYPE.INDEX_CN, if_fq=True, market_data=None, market_type='stock'):
         """
         account: QA_Account类/QA_PortfolioView类
         benchmark_code: [str]对照参数代码
@@ -104,7 +104,7 @@ class QA_Risk():
         self.account = account
         self.benchmark_code = benchmark_code  # 默认沪深300
         self.benchmark_type = benchmark_type
-
+        self.marke_type = market_type  #默认股票
         self.fetch = {MARKET_TYPE.STOCK_CN: QA_fetch_stock_day_adv,
                       MARKET_TYPE.INDEX_CN: QA_fetch_index_day_adv}
         if self.account.market_type == MARKET_TYPE.STOCK_CN:
@@ -117,6 +117,9 @@ class QA_Risk():
         if self.market_value is not None:
             self._assets = (self.market_value.sum(
                 axis=1) + self.account.daily_cash.set_index('date').cash).fillna(method='pad')
+        elif self.market_value is not None and self.market_type == 'future' :
+            self._assets = self.account.daily_cash.set_index(
+                'date').cash.fillna(method='pad')
         else:
             self._assets = self.account.daily_cash.set_index(
                 'date').cash.fillna(method='pad')
