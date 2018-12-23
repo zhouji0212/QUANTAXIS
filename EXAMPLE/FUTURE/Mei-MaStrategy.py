@@ -190,7 +190,7 @@ for day_products in DayData.panel_gen:
                 #print(rec_msg)
                 trade_mes = Broker.query_orders(Account.account_cookie, 'filled')
                 res = trade_mes.loc[order.account_cookie, order.realorder_id]
-                msg = order.trade_future(res.trade_id, res.trade_price, res.trade_amount, res.trade_time, margin)
+                msg = order.trade(res.trade_id, res.trade_price, res.trade_amount, res.trade_time, margin)
                 print(msg)
             elif abs(position) == volume:
                 print('不用动仓位')

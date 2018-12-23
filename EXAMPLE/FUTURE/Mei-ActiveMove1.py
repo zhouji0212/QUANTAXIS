@@ -12,17 +12,17 @@ class Test_ActiveMove():
 
     def __init__(self):
         self.starttime = datetime.date(2018, 1, 1)
-        self.endtime = datetime.date(2018, 11,10 )
+        self.endtime = datetime.date(2018, 12,21 )
         self.strstartday = str(self.starttime - datetime.timedelta(days=1))
         self.strstartmaday = str(self.starttime - datetime.timedelta(days=90))
         self.strstartmin = str(self.starttime - datetime.timedelta(days=3))
         self.strendday = str(self.endtime)
         self.strendmin = str(self.endtime)
 
-        self.init_cash = 1000000
+        self.init_cash = 200000
         self.margin = 0.1
         # products = ['MA1901', 'I1901', 'RM1901', 'TA1901']
-        self.products = ['I1901']
+        self.products = ['TA1901']
         # products = ['TA1901', 'RB1901','RM1901']
         self.cookie = '!'.join(self.products)
         self.volume = 10  # 手数
@@ -39,7 +39,7 @@ class Test_ActiveMove():
         self.temp_dayproduct = {}
         self.Account = QA.QA_Account(init_cash=self.init_cash, allow_sellopen=True, allow_t0=True,
                                 market_type=QA.MARKET_TYPE.FUTURE_CN,
-                                frequence=QA.FREQUENCE.DAY)
+                                frequence=QA.FREQUENCE.DAY,margin_rate=self.margin)
         self.Broker = QA.QA_BacktestBroker()
 
 #建立一个空的时间列表
